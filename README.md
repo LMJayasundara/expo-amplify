@@ -23,4 +23,7 @@
    ```
 5. ```
    npx expo run:android
+   
+   for ios: npx expo run:ios --no-build-cache --device
+   android: npx expo run:android --no-build-cache --device
    ```

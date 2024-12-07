@@ -1,154 +1,155 @@
 // app/(auth)/signup.tsx
-import React, { useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { AuthContext } from '@/context/AuthContext';
-import { Link, useRouter } from 'expo-router';
-import { ScrollView } from 'react-native-gesture-handler';
+import React, { useState } from 'react';
+import { View, Text, Alert, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { useLoadingState } from '@/hooks/useLoadingState';
+import { AuthLayout } from '@/components/layouts/AuthLayout';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { validateEmail, validatePassword } from '@/utils/validation';
+import { Picker } from '@/components/ui/Picker';
+import { useFormField } from '@/hooks/useFormField';
+import { useErrorBanner } from '@/hooks/useErrorBanner';
 
 export default function SignUpScreen() {
-  const { isLoading, register } = useContext(AuthContext);
+  const { value: username, onChange: setUsername } = useFormField('');
+  const { value: email, onChange: setEmail } = useFormField('');
+  const { value: password, onChange: setPassword } = useFormField('');
+  const { value: confirmPassword, onChange: setConfirmPassword } = useFormField('');
+  const [role, setRole] = useState('passenger');
+  const { register } = useAuth();
   const router = useRouter();
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('passenger'); // Default role
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isLoading, withLoading } = useLoadingState();
+  const { error, visible, showError, clearError } = useErrorBanner();
 
   const handleSignUp = async () => {
     if (!email || !password || !username || !confirmPassword || !role) {
-      setError('All fields are required');
+      showError('All fields are required');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      showError('Please enter a valid email');
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      showError('Passwords do not match');
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      showError(passwordError);
       return;
     }
 
-    try {
-      setError('');
-      setIsSubmitting(true);
-      const { nextStep } = await register(username, email, password, role);
-
-      console.log("nextStep: ", nextStep);
-      
-      switch (nextStep.signUpStep) {
-        case 'CONFIRM_SIGN_UP':
-          Alert.alert('Verification Required', 'Check your email for a code', [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace({
-                  pathname: '/(auth)/verify',
-                  params: { email, password }
-                });
+    await withLoading(async () => {
+      try {
+        const { nextStep } = await register(username, email, password, role);
+        
+        switch (nextStep.signUpStep) {
+          case 'CONFIRM_SIGN_UP':
+            Alert.alert('Verification Required', 'Check your email for a code', [
+              {
+                text: 'OK',
+                onPress: () => {
+                  router.replace({
+                    pathname: '/(auth)/verify',
+                    params: { email, password }
+                  });
+                }
               }
-            }
-          ]);
-          break;
-        case 'DONE':
-          // Handled by root navigation
-          break;
-        default:
-          setError(`Unsupported sign-up step: ${nextStep.signUpStep}`);
-          break;
+            ]);
+            break;
+          case 'DONE':
+            // Handled by root navigation
+            break;
+          default:
+            showError(`Unsupported sign-up step: ${nextStep.signUpStep}`);
+            break;
+        }
+      } catch (err: any) {
+        showError(err.message);
+        Alert.alert('Registration Failed', err.message);
       }
-    } catch (err: any) {
-      setError(err.message);
-      Alert.alert('Registration Failed', err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
+  const handleInputChange = (setter: (text: string) => void) => (text: string) => {
+    setter(text);
+    clearError();
+  };
+
+  const roleOptions = [
+    { label: 'Passenger', value: 'passenger' },
+    { label: 'Driver', value: 'driver' }
+  ];
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1"
-    >
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1 }}
-        className="flex-1"
+    <AuthLayout error={error} showError={visible}>
+      <Text className="text-2xl font-bold mb-6 text-center">Create Account</Text>
+
+      <Input
+        placeholder="Username"
+        value={username}
+        onChangeText={handleInputChange(setUsername)}
+        className="mb-4"
+      />
+
+      <Input
+        placeholder="Email"
+        value={email}
+        onChangeText={handleInputChange(setEmail)}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        className="mb-4"
+      />
+
+      <View className="mb-4">
+        <Text className="mb-2 font-semibold">Select Role:</Text>
+        <Picker
+          value={role}
+          onValueChange={(value) => {
+            setRole(value);
+            clearError();
+          }}
+          options={roleOptions}
+          placeholder="Select a role"
+        />
+      </View>
+
+      <Input
+        placeholder="Password"
+        value={password}
+        onChangeText={handleInputChange(setPassword)}
+        secureTextEntry
+        className="mb-4"
+      />
+
+      <Input
+        placeholder="Confirm Password"
+        value={confirmPassword}
+        onChangeText={handleInputChange(setConfirmPassword)}
+        secureTextEntry
+        className="mb-6"
+      />
+
+      <Button
+        onPress={handleSignUp}
+        loading={isLoading}
+        className="mb-4"
       >
-        <View className="flex-1 justify-center p-6 bg-white">
-          <Text className="text-2xl font-bold mb-6 text-center">Create Account</Text>
+        Sign Up
+      </Button>
 
-          {error ? <Text className="text-red-500 mb-4 text-center">{error}</Text> : null}
-
-          <TextInput
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
-            className="mb-4 p-4 border border-gray-300 rounded-lg w-full bg-white"
-          />
-          <TextInput
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            className="mb-4 p-4 border border-gray-300 rounded-lg w-full bg-white"
-          />
-
-          {/* Role Selection */}
-          <View className="mb-4">
-            <Text className="mb-2 font-semibold">Select Role:</Text>
-            <Picker
-              selectedValue={role}
-              onValueChange={(itemValue: string) => setRole(itemValue)}
-            >
-              <Picker.Item label="Passenger" value="passenger" />
-              <Picker.Item label="Driver" value="driver" />
-            </Picker>
-          </View>
-
-          <TextInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            className="mb-4 p-4 border border-gray-300 rounded-lg w-full bg-white"
-          />
-          <TextInput
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            className="mb-6 p-4 border border-gray-300 rounded-lg w-full bg-white"
-          />
-
-          <TouchableOpacity
-            onPress={handleSignUp}
-            disabled={isSubmitting}
-            className={`p-4 rounded-lg mb-4 ${isSubmitting ? 'bg-gray-400' : 'bg-blue-500'}`}
-          >
-            {isSubmitting ? (
-              <View className="flex-row items-center justify-center">
-                <ActivityIndicator color="white" size="small" />
-                <Text className="text-white text-center font-semibold ml-2">Creating account...</Text>
-              </View>
-            ) : (
-              <Text className="text-white text-center font-semibold">Sign Up</Text>
-            )}
-          </TouchableOpacity>
-
-          <View className="flex-row justify-center items-center gap-4">
-            <Text className="text-gray-600">Already have an account?</Text>
-            <Link href="/(auth)/signin" replace className="text-blue-500">
-              Sign in
-            </Link>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <View className="flex-row justify-center items-center gap-4">
+        <Text className="text-gray-600">Already have an account?</Text>
+        <TouchableOpacity onPress={() => router.replace('/(auth)/signin')}>
+          <Text className="text-blue-500">Sign in</Text>
+        </TouchableOpacity>
+      </View>
+    </AuthLayout>
   );
 }
