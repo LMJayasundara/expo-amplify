@@ -1,6 +1,6 @@
 // context/AuthContext.tsx
 import React, { createContext, useState, useEffect } from 'react';
-import { type SignUpInput, signIn, signUp, signOut, getCurrentUser, confirmSignUp, resendSignUpCode } from 'aws-amplify/auth';
+import { type SignUpInput, signIn, signUp, signOut, getCurrentUser, confirmSignUp, resendSignUpCode, confirmResetPassword as amplifyConfirmResetPassword, resetPassword as amplifyResetPassword } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 
 type AuthError = {
@@ -16,18 +16,33 @@ type AuthContextType = {
   register: (username: string, email: string, password: string) => Promise<any>;
   confirmRegistration: (username: string, code: string) => Promise<any>;
   logout: () => Promise<void>;
-  resendConfirmationCode: (username: string) => Promise<any>;
+  confirmResetPassword: (username: string, newPassword: string, confirmationCode: string) => Promise<any>;
+  resendCode: (username: string, type: 'reset' | 'signup') => Promise<any>;
 };
 
-export const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>( {
   isAuthenticated: false,
   isLoading: true,
   login: async () => {},
   register: async () => {},
   confirmRegistration: async () => {},
   logout: async () => {},
-  resendConfirmationCode: async () => {},
+  confirmResetPassword: async () => {},
+  resendCode: async () => {},
 });
+
+// Helper function for error handling
+const handleAuthError = (error: any, defaultCode: string, defaultMessage: string): AuthError => {
+  console.log(`${defaultMessage} error: `, {
+    code: error.name,
+    message: error.message,
+    error
+  });
+  return {
+    code: error.code || defaultCode,
+    message: error.message || defaultMessage
+  };
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -62,29 +77,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const { isSignedIn, nextStep } = await signIn({ 
-        username: "s.s.shancoin@gmail.com",
-        password: "ShaN@19960930"
+        username: email,
+        password: password
       });
       return { isSignedIn, nextStep };
     } catch (error: any) {
-      console.log("Login error: ", {
-        code: error.name,
-        message: error.message,
-        error
-      });
-      
-      const authError: AuthError = {
-        code: error.name || 'DefaultSignInError',
-        message: error.message || 'An error occurred during login'
-      };
-
-      throw authError;
+      throw handleAuthError(error, 'DefaultSignInError', 'An error occurred during login');
     }
   };
 
   const register = async (username: string, email: string, password: string) => {
     try {
-      const result = await signUp({
+      const { nextStep } = await signUp({
         username: email,
         password,
         options: {
@@ -94,72 +98,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       });
-      return result;
+      return { nextStep };
     } catch (error: any) {
-      console.log("SignUp error: ", {
-        code: error.name,
-        message: error.message,
-        error
-      });
-
-      const authError: AuthError = {
-        code: error.code || 'DefaultSignUpError',
-        message: error.message || 'An error occurred during registration'
-      };
-
-      throw authError;
+      throw handleAuthError(error, 'DefaultSignUpError', 'An error occurred during registration');
     }
   };
 
   const confirmRegistration = async (username: string, code: string) => {
     try {
-      console.log('Confirming registration for:', username); // Debug log
       const result = await confirmSignUp({
         username,
         confirmationCode: code
       });
       return result;
     } catch (error: any) {
-      console.log("Confirm error: ", {
-        code: error.name,
-        message: error.message,
-        error
-      });
-
-      const authError: AuthError = {
-        code: error.code || 'DefaultConfirmError',
-        message: error.message || 'An error occurred during verification'
-      };
-
-      throw authError;
-    }
-  };
-
-  const resendConfirmationCode = async (username: string) => {
-    try {
-      const result = await resendSignUpCode({
-        username
-      });
-      return result;
-
-      // const { destination, deliveryMedium } = await resendSignUpCode({
-      //   username: email,
-      // });
-      // console.log(`A confirmation code has been sent to ${destination}.`);
-      // console.log(`Please check your ${deliveryMedium} for the code.`);
-    } catch (error: any) {
-      console.log("Resend code error: ", {
-        code: error.name,
-        message: error.message,
-        error
-      });
-  
-      const authError: AuthError = {
-        code: error.code || 'DefaultResendCodeError',
-        message: error.message || 'An error occurred while resending the code'
-      };
-  
-      throw authError;
+      throw handleAuthError(error, 'DefaultConfirmError', 'An error occurred during verification');
     }
   };
 
@@ -167,18 +120,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signOut();
     } catch (error: any) {
-      console.log("SignOut error: ", {
-        code: error.name,
-        message: error.message,
-        error
-      });
+      throw handleAuthError(error, 'DefaultSignOutError', 'An error occurred during logout');
+    }
+  };
 
-      const authError: AuthError = {
-        code: error.code || 'DefaultSignOutError',
-        message: error.message || 'An error occurred during logout'
-      };
+  const confirmResetPassword = async (username: string, newPassword: string, confirmationCode: string) => {
+    try {
+      await amplifyConfirmResetPassword({ username, newPassword, confirmationCode });
+    } catch (error: any) {
+      throw handleAuthError(error, 'DefaultConfirmResetPasswordError', 'An error occurred during password reset confirmation');
+    }
+  };
 
-      throw authError;
+  const resendCode = async (username: string, type: 'reset' | 'signup') => {
+    try {
+      if (type === 'reset') {
+        return await amplifyResetPassword({ username });
+      } else {
+        return await resendSignUpCode({ username });
+      }
+    } catch (error: any) {
+      throw handleAuthError(error, 'DefaultResendCodeError', 'An error occurred while resending the code');
     }
   };
 
@@ -190,7 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       confirmRegistration,
       logout,
-      resendConfirmationCode,
+      confirmResetPassword,
+      resendCode,
     }}>
       {children}
     </AuthContext.Provider>

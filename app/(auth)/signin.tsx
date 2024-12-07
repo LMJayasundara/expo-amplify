@@ -8,7 +8,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login, resendConfirmationCode } = useContext(AuthContext);
+  const { login, resendCode } = useContext(AuthContext);
   const router = useRouter();
 
   const handleSignIn = async () => {
@@ -20,14 +20,12 @@ export default function SignIn() {
     try {
       setError('');
       const { isSignedIn, nextStep } = await login(email, password);
-      console.log("nextStep: ", isSignedIn, nextStep);
 
       // Handle different next steps
       switch (nextStep.signInStep) {
         case 'CONFIRM_SIGN_UP':
           // User needs to verify their email
-          // console.log('Redirecting to verify with:', { email, password }); // Debug log          
-          await resendConfirmationCode(email);
+          await resendCode(email, 'signup');
           router.replace({
             pathname: '/(auth)/verify',
             params: {
@@ -43,35 +41,6 @@ export default function SignIn() {
             params: { email }
           });
           break;
-
-        // case 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED':
-        //   router.replace({
-        //     pathname: '/(auth)/new-password',
-        //     params: { email }
-        //   });
-        //   break;
-
-        // case 'CONFIRM_SIGN_IN_WITH_SMS_CODE':
-        // case 'CONFIRM_SIGN_IN_WITH_EMAIL_CODE':
-        // case 'CONFIRM_SIGN_IN_WITH_TOTP_CODE':
-        //   router.replace({
-        //     pathname: '/(auth)/verify-mfa',
-        //     params: { 
-        //       email,
-        //       type: nextStep.signInStep
-        //     }
-        //   });
-        //   break;
-
-        // case 'CONTINUE_SIGN_IN_WITH_MFA_SELECTION':
-        //   router.replace({
-        //     pathname: '/(auth)/mfa-selection',
-        //     params: { 
-        //       email,
-        //       options: JSON.stringify(nextStep.allowedMFATypes)
-        //     }
-        //   });
-        //   break;
 
         case 'DONE':
           // Navigation is handled by RootNavigation in _layout.tsx
@@ -127,14 +96,14 @@ export default function SignIn() {
 
       <TouchableOpacity
         className="mt-4"
-        onPress={() => router.push('/(auth)/signup')}
+        onPress={() => router.replace('/(auth)/signup')}
       >
         <Text className="text-blue-500 text-center">Don't have an account? Sign Up</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         className="mt-2"
-        onPress={() => router.push('/(auth)/reset')}
+        onPress={() => router.replace('/(auth)/reset')}
       >
         <Text className="text-blue-500 text-center">Forgot Password?</Text>
       </TouchableOpacity>

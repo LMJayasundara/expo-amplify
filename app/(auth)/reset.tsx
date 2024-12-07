@@ -6,17 +6,31 @@ import { Link, useRouter } from 'expo-router';
 import { ScrollView } from 'react-native-gesture-handler';
 
 export default function ResetScreen() {
-  const { resetPassword, isLoading } = useContext(AuthContext);
+  const { resendCode, isLoading } = useContext(AuthContext);
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
 
   const handleReset = async () => {
     try {
-      await resetPassword(email);
-      router.replace('/(auth)/verify-reset');
-    } catch (err) {
-      setError('Failed to send reset code');
+      setError(''); // Clear any previous errors
+      
+      // Basic email validation before making the API call
+      if (!email || !email.trim()) {
+        setError('Please enter your email address');
+        return;
+      }
+
+      await resendCode(email, 'reset');
+      router.replace({
+        pathname: '/(auth)/newpasswd',
+        params: { 
+          email: email.trim()
+        }
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset code');
+      // Don't navigate if there's an error
     }
   };
 

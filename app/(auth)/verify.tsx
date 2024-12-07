@@ -7,7 +7,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function VerifyScreen() {
-  const { isLoading, confirmRegistration, login, resendConfirmationCode } = useContext(AuthContext);
+  const { isLoading, confirmRegistration, login, resendCode } = useContext(AuthContext);
   const router = useRouter();
   const params = useLocalSearchParams<{ email: string; password: string }>();
   const [email] = useState(params.email);
@@ -58,7 +58,7 @@ export default function VerifyScreen() {
   const handleResend = async () => {
     try {
       setError('');
-      await resendConfirmationCode(email);
+      await resendCode(email, 'signup');
       Alert.alert(
         'Code Sent',
         'A new verification code has been sent to your email'

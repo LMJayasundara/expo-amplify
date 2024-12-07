@@ -8,7 +8,7 @@ export default function AuthLayout() {
       <Stack.Screen name="signup" />
       <Stack.Screen name="verify" />
       <Stack.Screen name="reset" />
-      <Stack.Screen name="verify-reset" />
+      <Stack.Screen name="newpasswd" />
     </Stack>
   );
 }

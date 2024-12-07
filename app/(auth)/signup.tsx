@@ -33,23 +33,35 @@ export default function SignUpScreen() {
     try {
       setError('');
       const { nextStep } = await register(username, email, password);
-      
-      if (nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
-        Alert.alert(
-          'Verification Required',
-          'Please check your email for a verification code',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace({
-                  pathname: '/(auth)/verify',
-                  params: { email, password }
-                });
+
+      // Handle different next steps
+      switch (nextStep.signInStep) {
+        case 'CONFIRM_SIGN_UP':
+          // User needs to verify their email
+          Alert.alert(
+            'Verification Required',
+            'Please check your email for a verification code',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  router.replace({
+                    pathname: '/(auth)/verify',
+                    params: { email, password }
+                  });
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+          break;
+
+        case 'DONE':
+          // Navigation is handled by RootNavigation in _layout.tsx
+          break;
+
+        default:
+          setError(`Unsupported sign-up step: ${nextStep.signInStep}`);
+          break;
       }
     } catch (err: any) {
       setError(err.message);
