@@ -17,5 +17,11 @@ export const auth = defineAuth({
           `We're happy to have you! You can now login with username ${user()} and temporary password ${code()}`,
       },
     },
+  },
+  userAttributes: {
+    "custom:role": {
+      dataType: "String",
+      mutable: true
+    }
   }
 });

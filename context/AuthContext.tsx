@@ -1,28 +1,25 @@
 // context/AuthContext.tsx
 import React, { createContext, useState, useEffect } from 'react';
-import { type SignUpInput, signIn, signUp, signOut, getCurrentUser, confirmSignUp, resendSignUpCode, confirmResetPassword as amplifyConfirmResetPassword, resetPassword as amplifyResetPassword } from 'aws-amplify/auth';
+import { signIn, signUp, signOut, getCurrentUser, confirmSignUp, resendSignUpCode, confirmResetPassword as amplifyConfirmResetPassword, resetPassword as amplifyResetPassword, fetchUserAttributes } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 
-type AuthError = {
-  code?: string;
-  message: string;
-  originalError?: any;
-};
-
+// Add role to AuthContextType
 type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
+  role: string | null;
   login: (email: string, password: string) => Promise<any>;
-  register: (username: string, email: string, password: string) => Promise<any>;
+  register: (username: string, email: string, password: string, role: string) => Promise<any>;
   confirmRegistration: (username: string, code: string) => Promise<any>;
   logout: () => Promise<void>;
   confirmResetPassword: (username: string, newPassword: string, confirmationCode: string) => Promise<any>;
   resendCode: (username: string, type: 'reset' | 'signup') => Promise<any>;
 };
 
-export const AuthContext = createContext<AuthContextType>( {
+export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
+  role: null,
   login: async () => {},
   register: async () => {},
   confirmRegistration: async () => {},
@@ -31,8 +28,7 @@ export const AuthContext = createContext<AuthContextType>( {
   resendCode: async () => {},
 });
 
-// Helper function for error handling
-const handleAuthError = (error: any, defaultCode: string, defaultMessage: string): AuthError => {
+const handleAuthError = (error: any, defaultCode: string, defaultMessage: string) => {
   console.log(`${defaultMessage} error: `, {
     code: error.name,
     message: error.message,
@@ -47,6 +43,7 @@ const handleAuthError = (error: any, defaultCode: string, defaultMessage: string
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     checkUser();
@@ -54,9 +51,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       switch (payload.event) {
         case 'signedIn':
           setIsAuthenticated(true);
+          loadUserRole(); // load role after sign in
           break;
         case 'signedOut':
           setIsAuthenticated(false);
+          setRole(null);
           break;
       }
     });
@@ -67,10 +66,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await getCurrentUser();
       setIsAuthenticated(true);
+      console.log('User authenticated, loading role...');
+      await loadUserRole();
     } catch (err) {
+      console.log('No authenticated user found');
       setIsAuthenticated(false);
+      setRole(null);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadUserRole() {
+    try {
+      const attributes = await fetchUserAttributes();
+      console.log('All user attributes:', attributes);
+      
+      const userRole = attributes['custom:role'];
+      console.log('Loaded user role from attributes:', userRole);
+      
+      if (!userRole) {
+        console.log('No role found in attributes, defaulting to passenger');
+        setRole('passenger');
+        return;
+      }
+      
+      setRole(userRole);
+    } catch (error) {
+      console.log('Error loading user role:', error);
+      console.log('Setting default role: passenger');
+      setRole('passenger');
     }
   }
 
@@ -80,21 +105,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username: email,
         password: password
       });
-      return { isSignedIn, nextStep };
+      // Get the user attributes
+      const attributes = await fetchUserAttributes();
+      const userRole = attributes['custom:role'] || 'passenger';
+      setRole(userRole);
+      return { isSignedIn, nextStep, role: userRole };
     } catch (error: any) {
       throw handleAuthError(error, 'DefaultSignInError', 'An error occurred during login');
     }
   };
 
-  const register = async (username: string, email: string, password: string) => {
+  const register = async (username: string, email: string, password: string, role: string) => {
     try {
+      console.log('Registering user with role:', role);
       const { nextStep } = await signUp({
         username: email,
         password,
         options: {
           userAttributes: {
             email,
-            preferred_username: username
+            preferred_username: username,
+            'custom:role': role
           }
         }
       });
@@ -106,10 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const confirmRegistration = async (username: string, code: string) => {
     try {
-      const result = await confirmSignUp({
-        username,
-        confirmationCode: code
-      });
+      const result = await confirmSignUp({ username, confirmationCode: code });
       return result;
     } catch (error: any) {
       throw handleAuthError(error, 'DefaultConfirmError', 'An error occurred during verification');
@@ -119,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await signOut();
+      setRole(null);
     } catch (error: any) {
       throw handleAuthError(error, 'DefaultSignOutError', 'An error occurred during logout');
     }
@@ -148,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       isAuthenticated,
       isLoading,
+      role,
       login,
       register,
       confirmRegistration,

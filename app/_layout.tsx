@@ -2,7 +2,7 @@
 import React, { useContext, useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, AuthContext } from '@/context/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Text } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,7 +26,7 @@ export default function RootLayout() {
 }
 
 function RootNavigation() {
-  const { isAuthenticated, isLoading } = useContext(AuthContext);
+  const { isAuthenticated, isLoading, role } = useContext(AuthContext);
   const router = useRouter();
   const segments = useSegments();
 
@@ -34,18 +34,25 @@ function RootNavigation() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const shouldBeInGroup = role === 'driver' ? '(driver)' : '(passenger)';
+    const currentGroup = segments[0];
 
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/(auth)/signin');
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
+    if (!isAuthenticated) {
+      // Not authenticated -> go to sign in
+      if (!inAuthGroup) {
+        router.replace('/(auth)/signin');
+      }
+    } else if (currentGroup !== shouldBeInGroup) {
+      // Authenticated but in wrong group -> redirect to correct group
+      router.replace(`/${shouldBeInGroup}`);
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, role]);
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text className="mt-4 text-gray-600">Loading...</Text>
       </View>
     );
   }

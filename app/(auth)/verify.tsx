@@ -1,6 +1,6 @@
 // app/(auth)/verify.tsx
 import React, { useContext, useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { AuthContext } from '@/context/AuthContext';
 import { Link } from 'expo-router';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -14,6 +14,8 @@ export default function VerifyScreen() {
   const [password] = useState(params.password);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
     if (!email || !password) {
@@ -30,12 +32,13 @@ export default function VerifyScreen() {
 
     try {
       setError('');
+      setIsSubmitting(true);
       const { isSignUpComplete } = await confirmRegistration(email, code);
       
       if (isSignUpComplete) {
         try {
-          await login(email, password);
-          router.replace('/(tabs)');
+          const { role } = await login(email, password);
+          router.replace(role === 'driver' ? '/(driver)' : '/(passenger)');
         } catch (loginError: any) {
           Alert.alert(
             'Verification Successful',
@@ -52,12 +55,15 @@ export default function VerifyScreen() {
     } catch (err: any) {
       setError(err.message);
       Alert.alert('Verification Failed', err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleResend = async () => {
     try {
       setError('');
+      setIsResending(true);
       await resendCode(email, 'signup');
       Alert.alert(
         'Code Sent',
@@ -66,6 +72,8 @@ export default function VerifyScreen() {
     } catch (err: any) {
       setError(err.message);
       Alert.alert('Failed to Resend', err.message);
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -104,17 +112,29 @@ export default function VerifyScreen() {
 
           <TouchableOpacity
             onPress={handleVerify}
-            disabled={isLoading}
-            className={`p-4 rounded-lg mb-4 ${isLoading ? 'bg-gray-400' : 'bg-blue-500'}`}
+            disabled={isSubmitting}
+            className={`p-4 rounded-lg mb-4 ${isSubmitting ? 'bg-gray-400' : 'bg-blue-500'}`}
           >
-            <Text className="text-white text-center font-semibold">
-              {isLoading ? 'Verifying...' : 'Verify'}
-            </Text>
+            {isSubmitting ? (
+              <View className="flex-row items-center justify-center">
+                <ActivityIndicator color="white" size="small" />
+                <Text className="text-white text-center font-semibold ml-2">Verifying...</Text>
+              </View>
+            ) : (
+              <Text className="text-white text-center font-semibold">Verify</Text>
+            )}
           </TouchableOpacity>
 
           <View className="flex-row justify-center items-center gap-4">
-            <TouchableOpacity onPress={handleResend} disabled={isLoading}>
-              <Text className="text-blue-500">Resend code</Text>
+            <TouchableOpacity onPress={handleResend} disabled={isResending}>
+              {isResending ? (
+                <View className="flex-row items-center">
+                  <ActivityIndicator color="#3b82f6" size="small" />
+                  <Text className="text-blue-500 ml-2">Sending code...</Text>
+                </View>
+              ) : (
+                <Text className="text-blue-500">Resend code</Text>
+              )}
             </TouchableOpacity>
             <Text className="text-gray-400">|</Text>
             <Link href="/(auth)/signin" replace className="text-blue-500">

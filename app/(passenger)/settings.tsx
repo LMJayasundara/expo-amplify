@@ -1,11 +1,11 @@
-// app/(tabs)/settings.tsx
+// app/(passenger)/settings.tsx
 import React, { useContext } from 'react';
 import { View, Text, Button, TouchableOpacity } from 'react-native';
 import { AuthContext } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 
-export default function SettingsScreen() {
+export default function PassengerSettingsScreen() {
   const { logout } = useContext(AuthContext);
   const router = useRouter();
 
@@ -20,7 +20,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Settings</Text>
+      <Text>Passenger Settings</Text>
       <TouchableOpacity 
         onPress={handleSignOut}
         className="bg-red-500 p-3 rounded-lg mt-4"
