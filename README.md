@@ -6,10 +6,10 @@
 
 ## Project Env:
 1. ```
-   npm create amplify@latest
+   npx create-expo-app@latest
    ```
 2. ```
-   npx ampx sandbox
+   npm create amplify@latest
    ```
 3. ```
    npm i @aws-amplify/ui-react-native
@@ -17,4 +17,10 @@
    npm i @react-native-async-storage/async-storage
    npm i react-native-get-random-values
    npm i react-native-url-polyfill
+   ```
+4. ```
+   npx ampx sandbox
+   ```
+5. ```
+   npx expo run:android
    ```

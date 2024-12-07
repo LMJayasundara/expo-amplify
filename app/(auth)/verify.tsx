@@ -1,28 +1,71 @@
 // app/(auth)/verify.tsx
-import React, { useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useContext, useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { AuthContext } from '@/context/AuthContext';
 import { Link } from 'expo-router';
 import { ScrollView } from 'react-native-gesture-handler';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function VerifyScreen() {
-  const { verifyEmail, resendCode, isLoading } = useContext(AuthContext);
+  const { isLoading, confirmRegistration, login, resendConfirmationCode } = useContext(AuthContext);
+  const router = useRouter();
+  const params = useLocalSearchParams<{ email: string; password: string }>();
+  const [email] = useState(params.email);
+  const [password] = useState(params.password);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Missing registration information');
+      router.replace('/(auth)/signup');
+    }
+  }, [email, password]);
+
   const handleVerify = async () => {
+    if (!code || code.length !== 6) {
+      setError('Please enter a valid 6-digit code');
+      return;
+    }
+
     try {
-      await verifyEmail(code);
-    } catch (err) {
-      setError('Invalid verification code');
+      setError('');
+      const { isSignUpComplete } = await confirmRegistration(email, code);
+      
+      if (isSignUpComplete) {
+        try {
+          await login(email, password);
+          router.replace('/(tabs)');
+        } catch (loginError: any) {
+          Alert.alert(
+            'Verification Successful',
+            'Your email has been verified. Please sign in.',
+            [
+              {
+                text: 'OK',
+                onPress: () => router.replace('/(auth)/signin')
+              }
+            ]
+          );
+        }
+      }
+    } catch (err: any) {
+      setError(err.message);
+      Alert.alert('Verification Failed', err.message);
     }
   };
 
   const handleResend = async () => {
     try {
-      await resendCode('stored-email', 'signup');
-    } catch (err) {
-      setError('Failed to resend code');
+      setError('');
+      await resendConfirmationCode(email);
+      Alert.alert(
+        'Code Sent',
+        'A new verification code has been sent to your email'
+      );
+    } catch (err: any) {
+      setError(err.message);
+      Alert.alert('Failed to Resend', err.message);
     }
   };
 

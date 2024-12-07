@@ -1,12 +1,12 @@
 // app/(auth)/signup.tsx
 import React, { useContext, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { AuthContext } from '@/context/AuthContext';
 import { Link, useRouter } from 'expo-router';
 import { ScrollView } from 'react-native-gesture-handler';
 
 export default function SignUpScreen() {
-  const { signUp, isLoading } = useContext(AuthContext);
+  const { isLoading, register } = useContext(AuthContext);
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -15,15 +15,45 @@ export default function SignUpScreen() {
   const [error, setError] = useState('');
 
   const handleSignUp = async () => {
+    if (!email || !password || !username || !confirmPassword) {
+      setError('All fields are required');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
     try {
-      await signUp(username, email, password);
-      router.replace('/(auth)/verify');
-    } catch (err) {
-      setError('Failed to sign up');
+      setError('');
+      const { nextStep } = await register(username, email, password);
+      
+      if (nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        Alert.alert(
+          'Verification Required',
+          'Please check your email for a verification code',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                router.replace({
+                  pathname: '/(auth)/verify',
+                  params: { email, password }
+                });
+              }
+            }
+          ]
+        );
+      }
+    } catch (err: any) {
+      setError(err.message);
+      Alert.alert('Registration Failed', err.message);
     }
   };
 
